@@ -1,0 +1,146 @@
+pip install opencv-python
+
+import cv2
+import numpy as np
+import datetime
+import time
+
+configPath = "yolov3.cfg" 
+weightsPath = "yolov3.weights" 
+namesPath = "coco.names"
+
+with open(namesPath, "r") as f:
+    classes = [line.strip() for line in f.readlines()]
+
+net = cv2.dnn.readNetFromDarknet(configPath, weightsPath)
+layer_names = net.getLayerNames()
+output_layers = [layer_names[i - 1] for i in net.getUnconnectedOutLayers()]
+
+contador_pessoas = 0
+tempo_inicio = time.time()
+intervalo = 30
+
+def salvar_log(contador_pessoas, pessoas_no_intervalo):
+    with open("log_pessoas_yolo.txt", "a") as arquivo:
+        data_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        arquivo.write(f"{data_hora}: Total de pessoas detectadas - {contador_pessoas}, "
+                      f"Pessoas neste intervalo - {pessoas_no_intervalo}\n")
+    print(f"Log salvo. Total: {contador_pessoas}, Pessoas no intervalo: {pessoas_no_intervalo}.")
+
+
+cap = cv2.VideoCapture(0)
+
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+
+    blob = cv2.dnn.blobFromImage(frame, 1 / 120.0, (128, 128), (0, 0, 0), swapRB=True, crop=False)
+    net.setInput(blob)
+    detections = net.forward(output_layers)
+
+    pessoas_no_intervalo = 0
+
+    for detection in detections:
+        for obj in detection:
+            scores = obj[5:]
+            class_id = np.argmax(scores)
+            confidence = scores[class_id]
+
+            if classes[class_id] == "person" and confidence > 0.3:
+                pessoas_no_intervalo += 1
+                contador_pessoas += 1
+
+                (h, w) = frame.shape[:2]
+                box = obj[0:4] * np.array([w, h, w, h])
+                (centerX, centerY, width, height) = box.astype("int")
+                x = int(centerX - (width / 2))
+                y = int(centerY - (height / 2))
+
+                cv2.rectangle(frame, (x, y), (x + int(width), y + int(height)), (0, 255, 0), 2)
+
+    cv2.imshow("Detecção de Pessoas YOLO", frame)
+
+    if time.time() - tempo_inicio >= intervalo:
+        salvar_log(contador_pessoas, pessoas_no_intervalo)
+        tempo_inicio = time.time()
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+
+sensor:
+
+
+# import cv2
+# import datetime
+# import time
+#
+# # Variáveis para controle
+# evento_movimento = 0  # Contador de eventos de movimento
+# tempo_inicio = time.time()  # Tempo de início da gravação
+# intervalo = 30  # Tempo em segundos para salvar o log (ex: 5 minutos)
+#
+# # Função para salvar o log em um arquivo .txt com a contagem total de movimentos
+# def salvar_log(evento_movimento):
+#     with open("log_movimento.txt", "a") as arquivo:
+#         data_hora = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#         arquivo.write(f"{data_hora}: Total de movimentos detectados - {evento_movimento}\n")
+#     print(f"Log salvo com o total de {evento_movimento} movimentos detectados até agora.")
+#
+# # Iniciar captura de vídeo pela webcam
+# cap = cv2.VideoCapture(0)
+# primeiro_frame = None
+#
+# while True:
+#     ret, frame = cap.read()
+#     if not ret:
+#         break
+#
+#     # Converter o frame para escala de cinza e aplicar um desfoque
+#     cinza = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#     cinza = cv2.GaussianBlur(cinza, (21, 21), 0)
+#
+#     # Inicializar o primeiro frame de referência
+#     if primeiro_frame is None:
+#         primeiro_frame = cinza
+#         continue
+#
+#     # Calcular a diferença entre o primeiro frame e o atual
+#     frame_delta = cv2.absdiff(primeiro_frame, cinza)
+#     _, thresh = cv2.threshold(frame_delta, 25, 255, cv2.THRESH_BINARY)
+#
+#     # Detectar contornos de movimento
+#     contornos, _ = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+#     movimento_detectado = False
+#
+#     for contorno in contornos:
+#         if cv2.contourArea(contorno) < 500:
+#             continue
+#         movimento_detectado = True
+#         (x, y, w, h) = cv2.boundingRect(contorno)
+#         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+#
+#     # Atualizar o evento de movimento se houver movimento detectado
+#     if movimento_detectado:
+#         evento_movimento += 1
+#
+#     # Exibir o feed da câmera (opcional para visualização)
+#     cv2.imshow("Feed da Webcam", frame)
+#
+#     # Salvar o log se o intervalo de tempo tiver sido atingido
+#     if time.time() - tempo_inicio >= intervalo:
+#         salvar_log(evento_movimento)
+#         tempo_inicio = time.time()  # Resetar o tempo
+#
+#     # Pressionar 'q' para sair
+#     if cv2.waitKey(1) & 0xFF == ord('q'):
+#         break
+#
+# # Encerrar a captura de vídeo e fechar as janelas
+# cap.release()
+# cv2.destroyAllWindows()
